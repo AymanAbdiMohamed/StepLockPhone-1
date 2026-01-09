@@ -17,8 +17,8 @@ StepLockPhone is a React Native app built with Expo (Dev Client / Bare workflow)
 - **Languages:** TypeScript
 - **Native Modules:** Kotlin (Android)
 - **Step Counter:** Expo Pedometer
-- **Version Control:** Git / GitHub
 
 ## Project Structure
+
 
 
