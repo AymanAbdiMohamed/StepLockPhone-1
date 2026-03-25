@@ -9,7 +9,7 @@ StepLockPhone is a Flutter app that enforces physical activity by gatekeeping sm
 - **Real-time step tracking** — live step count and progress indicator powered by the device pedometer
 - **Configurable step goal** — default 1,000 steps; adjustable via Settings (1–100,000)
 - **Permission handling** — gracefully handles Activity Recognition permission denial; prompts to re-grant or open OS settings
-- **Emulator/testing mode** — simulated step button (+50) appears automatically when the pedometer is unavailable
+- **Emulator/testing mode** — simulated step button (+50) appears automatically when the pedometer is unavailable (including Linux desktop)
 
 ## Tech Stack
 
@@ -21,7 +21,7 @@ StepLockPhone is a Flutter app that enforces physical activity by gatekeeping sm
 | **Persistence** | [`shared_preferences`](https://pub.dev/packages/shared_preferences) ^2.3.0 |
 | **Permissions** | [`permission_handler`](https://pub.dev/packages/permission_handler) ^11.3.1 |
 | **UI** | Material Design 3, dark theme |
-| **Platforms** | Android, iOS |
+| **Platforms** | Android, iOS, Linux (desktop, for development) |
 
 ## Project Structure
 
@@ -67,6 +67,12 @@ To run on a physical Android device (recommended — emulators lack a hardware s
 
 ```bash
 flutter run -d <device-id>
+```
+
+To run on Linux desktop (for development/UI testing — pedometer unavailable, use the Simulate Steps button):
+
+```bash
+flutter run -d linux
 ```
 
 To reset the lock state for testing:

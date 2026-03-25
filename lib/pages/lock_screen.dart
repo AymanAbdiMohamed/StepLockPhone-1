@@ -51,18 +51,22 @@ class _LockScreenState extends State<LockScreen> {
   }
 
   Future<void> _requestPermissionAndStart() async {
-    final status = await Permission.activityRecognition.status;
-    if (status.isDenied || status.isRestricted) {
-      final result = await Permission.activityRecognition.request();
-      if (!result.isGranted) {
-        if (!mounted) return;
-        setState(() {
-          _permissionDenied = true;
-        });
-        // Still subscribe — step service will emit simulated steps on error
-        _subscribeToSteps();
-        return;
+    try {
+      final status = await Permission.activityRecognition.status;
+      if (status.isDenied || status.isRestricted) {
+        final result = await Permission.activityRecognition.request();
+        if (!result.isGranted) {
+          if (!mounted) return;
+          setState(() {
+            _permissionDenied = true;
+          });
+          // Still subscribe — step service will emit simulated steps on error
+          _subscribeToSteps();
+          return;
+        }
       }
+    } catch (_) {
+      // Permission plugin unavailable (e.g. Linux desktop) — proceed without it
     }
     _subscribeToSteps();
   }
