@@ -1,4 +1,6 @@
-<device-admin>
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android"
+    android:label="@string/Steps_to_enable_device_admin"
+    android:description="@string/Steps_to_enable_device_admin">
     <uses-policies>
         <force-lock />
     </uses-policies>
