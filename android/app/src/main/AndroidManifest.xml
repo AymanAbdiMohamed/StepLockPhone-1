@@ -28,7 +28,22 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+    
+        <receiver android:name=".StepLockDeviceAdmin"
+            android:label="StepLock Screen Lock"
+            android:description="@string/device_admin_description"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+    
     </application>
+
+
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
@@ -37,14 +52,3 @@
     </queries>
 </manifest>
 
-<receiver android:name=".DeviceAdminReceiver"
-    android:label="StepLock Screen Lock"
-    android:description="@string/Steps_to_enable_device_admin"
-    android:permission="android.permission.BIND_DEVICE_ADMIN">
-    <meta-data
-        android:name="android.app.device_admin"
-        android:resource="@xml/device_admin" />
-    <intent-filter>
-        <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
-    </intent-filter>
-</receiver>
