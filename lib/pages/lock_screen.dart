@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -38,8 +39,15 @@ class _LockScreenState extends State<LockScreen> {
   @override
   void initState() {
     super.initState();
-    _loadGoal();
-    _requestPermissionAndStart();
+    _initialize();
+  }
+
+  // FIX: load goal first, then start pedometer — eliminates the race condition
+  // where the unlock check could fire against the default 1000 goal instead
+  // of the user's saved goal.
+  Future<void> _initialize() async {
+    await _loadGoal();
+    await _requestPermissionAndStart();
   }
 
   Future<void> _loadGoal() async {
@@ -60,7 +68,6 @@ class _LockScreenState extends State<LockScreen> {
           setState(() {
             _permissionDenied = true;
           });
-          // Still subscribe — step service will emit simulated steps on error
           _subscribeToSteps();
           return;
         }
@@ -72,6 +79,8 @@ class _LockScreenState extends State<LockScreen> {
   }
 
   void _subscribeToSteps() {
+    // Cancel any existing subscription before creating a new one
+    _stepsSubscription?.cancel();
     _stepsSubscription = widget.stepService.stepsStream.listen((steps) {
       if (!mounted) return;
       setState(() {
@@ -90,6 +99,10 @@ class _LockScreenState extends State<LockScreen> {
       setState(() {
         _permissionDenied = false;
       });
+      // FIX: restart pedometer subscription after permission is granted —
+      // previously the old subscription (started while permission was denied)
+      // would just continue on the error/simulated stream with no real steps.
+      _subscribeToSteps();
     } else {
       await openAppSettings();
     }
@@ -118,176 +131,186 @@ class _LockScreenState extends State<LockScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final progress = (_stepGoal > 0 ? _currentSteps / _stepGoal : 0.0)
-        .clamp(0.0, 1.0);
+    final progress = (_stepGoal > 0 ? _currentSteps / _stepGoal : 0.0).clamp(
+      0.0,
+      1.0,
+    );
     final stepsRemaining = (_stepGoal - _currentSteps).clamp(0, _stepGoal);
 
-    return Scaffold(
-      backgroundColor: _bgColor,
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Padlock icon
-                Icon(
-                  _unlocked ? Icons.lock_open : Icons.lock,
-                  size: 80,
-                  color: _unlocked ? Colors.greenAccent : _highlightColor,
-                ),
-                const SizedBox(height: 24),
-
-                // Good Morning heading
-                const Text(
-                  'Good Morning',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 1.2,
+    return PopScope(
+      // FIX: block the Android back button — without this the lock screen
+      // is trivially bypassed by pressing back.
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: _bgColor,
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Padlock icon
+                  Icon(
+                    _unlocked ? Icons.lock_open : Icons.lock,
+                    size: 80,
+                    color: _unlocked ? Colors.greenAccent : _highlightColor,
                   ),
-                ),
-                const SizedBox(height: 32),
+                  const SizedBox(height: 24),
 
-                // Step count
-                Text(
-                  '$_currentSteps',
-                  style: const TextStyle(
-                    fontSize: 72,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-
-                // Step goal label
-                Text(
-                  '/ $_stepGoal steps',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    color: Colors.white54,
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Circular progress indicator
-                SizedBox(
-                  width: 140,
-                  height: 140,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      CircularProgressIndicator(
-                        value: progress,
-                        strokeWidth: 12,
-                        backgroundColor: _accentColor,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          _unlocked ? Colors.greenAccent : _highlightColor,
-                        ),
-                      ),
-                      Text(
-                        '${(progress * 100).toInt()}%',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Motivational message or unlocked state
-                if (_unlocked) ...[
+                  // TODO: make time-aware (Good Morning / Afternoon / Evening)
                   const Text(
-                    'Unlocked! 🎉',
+                    'Good Morning',
                     style: TextStyle(
-                      fontSize: 24,
+                      fontSize: 28,
                       fontWeight: FontWeight.bold,
-                      color: Colors.greenAccent,
+                      color: Colors.white,
+                      letterSpacing: 1.2,
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: _enterHome,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.greenAccent,
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 48,
-                        vertical: 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    child: const Text(
-                      'Enter',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ] else ...[
+                  const SizedBox(height: 32),
+
+                  // Step count
                   Text(
-                    'Walk $stepsRemaining more steps to unlock your phone',
-                    textAlign: TextAlign.center,
+                    '$_currentSteps',
                     style: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.white70,
+                      fontSize: 72,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
-                ],
 
-                const SizedBox(height: 32),
+                  // Step goal label
+                  Text(
+                    '/ $_stepGoal steps',
+                    style: const TextStyle(fontSize: 18, color: Colors.white54),
+                  ),
+                  const SizedBox(height: 32),
 
-                // Permission error section
-                if (_permissionDenied) ...[
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _primaryColor,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
+                  // Circular progress indicator
+                  SizedBox(
+                    width: 140,
+                    height: 140,
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: [
-                        const Text(
-                          'Step counting requires Activity Recognition permission.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.white70, fontSize: 13),
-                        ),
-                        const SizedBox(height: 12),
-                        OutlinedButton(
-                          onPressed: _grantPermission,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: _highlightColor,
-                            side: const BorderSide(color: _highlightColor),
+                        CircularProgressIndicator(
+                          value: progress,
+                          strokeWidth: 12,
+                          backgroundColor: _accentColor,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            _unlocked ? Colors.greenAccent : _highlightColor,
                           ),
-                          child: const Text('Grant Permission'),
+                        ),
+                        Text(
+                          '${(progress * 100).toInt()}%',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                ],
+                  const SizedBox(height: 32),
 
-                // Simulate steps button (for testing when pedometer unavailable)
-                if (!widget.stepService.isAvailable || _permissionDenied) ...[
-                  TextButton.icon(
-                    onPressed: () {
-                      widget.stepService.simulateSteps(50);
-                    },
-                    icon: const Icon(Icons.directions_walk, color: Colors.white54),
-                    label: const Text(
-                      'Simulate Steps +50',
-                      style: TextStyle(color: Colors.white54, fontSize: 13),
+                  // Motivational message or unlocked state
+                  if (_unlocked) ...[
+                    const Text(
+                      'Unlocked! 🎉',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.greenAccent,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: _enterHome,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.greenAccent,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 48,
+                          vertical: 16,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      child: const Text(
+                        'Enter',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    Text(
+                      'Walk $stepsRemaining more steps to unlock your phone',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 32),
+
+                  // Permission error section
+                  if (_permissionDenied) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: _primaryColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Step counting requires Activity Recognition permission.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          OutlinedButton(
+                            onPressed: _grantPermission,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: _highlightColor,
+                              side: const BorderSide(color: _highlightColor),
+                            ),
+                            child: const Text('Grant Permission'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // FIX: simulate button is debug-only and uses widget.stepService.
+                  // Previously this was available in production to anyone who denied
+                  // permission — a direct bypass of the lock.
+                  if (kDebugMode &&
+                      (!widget.stepService.isAvailable || _permissionDenied))
+                    TextButton.icon(
+                      onPressed: () => widget.stepService.simulateSteps(50),
+                      icon: const Icon(
+                        Icons.directions_walk,
+                        color: Colors.white54,
+                      ),
+                      label: const Text(
+                        'Simulate Steps +50 (Debug)',
+                        style: TextStyle(color: Colors.white54, fontSize: 13),
+                      ),
+                    ),
                 ],
-              ],
+              ),
             ),
           ),
         ),

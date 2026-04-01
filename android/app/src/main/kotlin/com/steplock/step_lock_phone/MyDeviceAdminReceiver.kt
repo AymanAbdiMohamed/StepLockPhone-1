@@ -1,6 +1,5 @@
-package com.yourpackage.steplockphone
-
-import android.app.main.DeviceAdminReceiver
+package com.steplock.step_lock_phone
+import android.app.admin.DeviceAdminReceiver
 import android.content.Context
 import android.content.Intent
 
