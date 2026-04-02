@@ -17,7 +17,7 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "lockNow" -> {
                     val dpm = getSystemService(DEVICE_POLICY_SERVICE) as DevicePolicyManager
-                    val adminComponent = ComponentName(this, MyDeviceAdminReceiver::class.java)
+                    val adminComponent = ComponentName(this, StepLockDeviceAdmin::class.java)
                     if (dpm.isAdminActive(adminComponent)) {
                         dpm.lockNow()
                         result.success(true)
@@ -27,11 +27,11 @@ class MainActivity : FlutterActivity() {
                 }
                 "isAdminActive" -> {
                     val dpm = getSystemService(DEVICE_POLICY_SERVICE) as DevicePolicyManager
-                    val adminComponent = ComponentName(this, MyDeviceAdminReceiver::class.java)
+                    val adminComponent = ComponentName(this, StepLockDeviceAdmin::class.java)
                     result.success(dpm.isAdminActive(adminComponent))
                 }
                 "requestAdminActivation" -> {
-                    val adminComponent = ComponentName(this, MyDeviceAdminReceiver::class.java)
+                    val adminComponent = ComponentName(this, StepLockDeviceAdmin::class.java)
                     val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
                         putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent)
                         putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Required to lock your phone when you haven't hit your step goal.")

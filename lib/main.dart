@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'services/step_service.dart';
 import 'services/lock_service.dart';
 import 'pages/lock_screen.dart';
@@ -12,12 +13,15 @@ void main() async {
 
   await stepService.init();
 
+  final prefs = await SharedPreferences.getInstance();
+  final stepGoal = prefs.getInt('step_goal') ?? 1000;
   final isLocked = await lockService.isLockedToday();
 
   runApp(StepLockApp(
     stepService: stepService,
     lockService: lockService,
     isLocked: isLocked,
+    stepGoal: stepGoal,
   ));
 }
 
@@ -25,12 +29,14 @@ class StepLockApp extends StatelessWidget {
   final StepService stepService;
   final LockService lockService;
   final bool isLocked;
+  final int stepGoal;
 
   const StepLockApp({
     super.key,
     required this.stepService,
     required this.lockService,
     required this.isLocked,
+    required this.stepGoal,
   });
 
   @override
@@ -53,7 +59,7 @@ class StepLockApp extends StatelessWidget {
               stepService: stepService,
               lockService: lockService,
               currentSteps: 0,
-              stepGoal: 1000,
+              stepGoal: stepGoal,
             ),
     );
   }
