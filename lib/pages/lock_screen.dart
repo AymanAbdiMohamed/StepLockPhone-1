@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/step_service.dart';
 import '../services/lock_service.dart';
+import '../services/device_admin_service.dart';
 import 'home_screen.dart';
 
 const Color _bgColor = Color(0xff1A1A2E);
@@ -30,6 +31,8 @@ class _LockScreenState extends State<LockScreen> {
   static const String _keyStepGoal = 'step_goal';
   static const int _defaultGoal = 1000;
 
+  final _deviceAdminService = DeviceAdminService();
+
   StreamSubscription<int>? _stepsSubscription;
   int _currentSteps = 0;
   int _stepGoal = _defaultGoal;
@@ -42,11 +45,15 @@ class _LockScreenState extends State<LockScreen> {
     _initialize();
   }
 
-  // FIX: load goal first, then start pedometer — eliminates the race condition
+  // Load goal first, then enforce OS-level lock, then start pedometer.
+  // Loading the goal before the pedometer subscription eliminates the race
   // where the unlock check could fire against the default 1000 goal instead
   // of the user's saved goal.
   Future<void> _initialize() async {
     await _loadGoal();
+    // Enforce OS-level screen lock on every launch while the app is locked.
+    // If device admin is not yet active this triggers the activation flow.
+    unawaited(_deviceAdminService.lockNow());
     await _requestPermissionAndStart();
   }
 

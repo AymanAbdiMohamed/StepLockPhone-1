@@ -1,5 +1,4 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/services.dart';
 
 class LockService {
   static const String _keyUnlockedDate = 'unlocked_date';
@@ -27,34 +26,5 @@ class LockService {
   Future<void> resetLock() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyUnlockedDate);
-  }
-}
-
-class DeviceAdminService {
-  static const _channel = MethodChannel(
-    'com.steplock.step_lock_phone/device_admin',
-  );
-
-  Future<bool> isAdminActive() async {
-    try {
-      return await _channel.invokeMethod<bool>('isAdminActive') ?? false;
-    } on PlatformException {
-      return false;
-    }
-  }
-
-  Future<void> requestAdminActivation() async {
-    await _channel.invokeMethod('requestAdminActivation');
-  }
-
-  Future<bool> lockNow() async {
-    try {
-      return await _channel.invokeMethod<bool>('lockNow') ?? false;
-    } on PlatformException catch (e) {
-      if (e.code == 'NOT_ADMIN') {
-        await requestAdminActivation();
-      }
-      return false;
-    }
   }
 }
