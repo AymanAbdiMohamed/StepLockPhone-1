@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../services/step_service.dart';
 import '../services/lock_service.dart';
 import 'settings_page.dart';
+import 'lock_screen.dart';
 
 const Color _bgColor = Color(0xff1A1A2E);
 const Color _accentColor = Color(0xff16213E);
@@ -53,9 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _openSettings() async {
     final newGoal = await Navigator.of(context).push<int>(
-      MaterialPageRoute(
-        builder: (_) => SettingsPage(currentGoal: _stepGoal),
-      ),
+      MaterialPageRoute(builder: (_) => SettingsPage(currentGoal: _stepGoal)),
     );
     if (newGoal != null && mounted) {
       setState(() {
@@ -66,8 +66,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final progress =
-        (_stepGoal > 0 ? _currentSteps / _stepGoal : 0.0).clamp(0.0, 1.0);
+    final progress = (_stepGoal > 0 ? _currentSteps / _stepGoal : 0.0).clamp(
+      0.0,
+      1.0,
+    );
 
     return Scaffold(
       backgroundColor: _bgColor,
@@ -123,10 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const Text(
                   'Great job reaching your step goal!',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Colors.white60,
-                  ),
+                  style: TextStyle(fontSize: 15, color: Colors.white60),
                 ),
                 const SizedBox(height: 40),
 
@@ -197,6 +196,28 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
+
+                // Debug button — only visible in debug builds, not in release
+                if (kDebugMode)
+                  TextButton(
+                    onPressed: () async {
+                      await widget.lockService.resetLock();
+                      if (!mounted) return;
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(
+                          builder: (_) => LockScreen(
+                            stepService: widget.stepService,
+                            lockService: widget.lockService,
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'Reset Lock (Debug)',
+                      style: TextStyle(color: Colors.white30),
+                    ),
+                  ),
+
                 const SizedBox(height: 32),
 
                 // Lock again tomorrow message
@@ -223,10 +244,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(width: 8),
                       const Text(
                         'Lock again tomorrow',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white70,
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.white70),
                       ),
                     ],
                   ),

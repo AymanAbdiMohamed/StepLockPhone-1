@@ -106,9 +106,10 @@ class _LockScreenState extends State<LockScreen> {
       setState(() {
         _permissionDenied = false;
       });
-      // FIX: restart pedometer subscription after permission is granted —
-      // previously the old subscription (started while permission was denied)
-      // would just continue on the error/simulated stream with no real steps.
+      // Restart pedometer subscription after permission is granted.
+      // Without this the old subscription (started while permission was denied)
+      // keeps running on the error/simulated stream — real steps never arrive
+      // until the user kills and restarts the app.
       _subscribeToSteps();
     } else {
       await openAppSettings();
@@ -130,6 +131,22 @@ class _LockScreenState extends State<LockScreen> {
     );
   }
 
+  // ADDED: returns a greeting string based on the current hour of the day.
+  // Previously the screen always said "Good Morning" regardless of the time.
+  // Now it checks DateTime.now().hour:
+  //   0–11  → Good Morning
+  //   12–16 → Good Afternoon
+  //   17+   → Good Evening
+  // This is a plain method (not async, no state) — it just reads the clock
+  // and returns a string. Called directly inside build() so it re-evaluates
+  // on every rebuild.
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  }
+
   @override
   void dispose() {
     _stepsSubscription?.cancel();
@@ -145,8 +162,8 @@ class _LockScreenState extends State<LockScreen> {
     final stepsRemaining = (_stepGoal - _currentSteps).clamp(0, _stepGoal);
 
     return PopScope(
-      // FIX: block the Android back button — without this the lock screen
-      // is trivially bypassed by pressing back.
+      // Blocks the Android back button so the user cannot bypass the lock
+      // screen by pressing back. Without this the lock is bypassed in one tap.
       canPop: false,
       child: Scaffold(
         backgroundColor: _bgColor,
@@ -157,7 +174,7 @@ class _LockScreenState extends State<LockScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Padlock icon
+                  // Padlock icon — changes to an open lock when goal is reached
                   Icon(
                     _unlocked ? Icons.lock_open : Icons.lock,
                     size: 80,
@@ -165,10 +182,12 @@ class _LockScreenState extends State<LockScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // TODO: make time-aware (Good Morning / Afternoon / Evening)
-                  const Text(
-                    'Good Morning',
-                    style: TextStyle(
+                  // CHANGED: was const Text('Good Morning') — hardcoded string.
+                  // Now calls _getGreeting() which reads the device clock.
+                  // 'const' is removed here because the value changes at runtime.
+                  Text(
+                    _getGreeting(),
+                    style: const TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -177,7 +196,7 @@ class _LockScreenState extends State<LockScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  // Step count
+                  // Step count display
                   Text(
                     '$_currentSteps',
                     style: const TextStyle(
@@ -267,7 +286,8 @@ class _LockScreenState extends State<LockScreen> {
 
                   const SizedBox(height: 32),
 
-                  // Permission error section
+                  // Permission error section — shown when activity recognition
+                  // permission was denied. Offers a button to re-request it.
                   if (_permissionDenied) ...[
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -300,9 +320,10 @@ class _LockScreenState extends State<LockScreen> {
                     const SizedBox(height: 16),
                   ],
 
-                  // FIX: simulate button is debug-only and uses widget.stepService.
-                  // Previously this was available in production to anyone who denied
-                  // permission — a direct bypass of the lock.
+                  // Simulate button is debug-only (kDebugMode = false in release).
+                  // Previously appeared for any user who denied permission,
+                  // giving them a way to fake steps and bypass the lock entirely.
+                  // Now it only exists during development builds.
                   if (kDebugMode &&
                       (!widget.stepService.isAvailable || _permissionDenied))
                     TextButton.icon(
