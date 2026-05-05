@@ -201,9 +201,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (kDebugMode)
                   TextButton(
                     onPressed: () async {
+                      final navigator = Navigator.of(context);
                       await widget.lockService.resetLock();
                       if (!mounted) return;
-                      Navigator.of(context).pushReplacement(
+                      navigator.pushReplacement(
                         MaterialPageRoute(
                           builder: (_) => LockScreen(
                             stepService: widget.stepService,
