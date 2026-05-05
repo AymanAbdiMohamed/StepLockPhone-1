@@ -39,6 +39,17 @@ class MainActivity : FlutterActivity() {
                     startActivity(intent)
                     result.success(null)
                 }
+                "startStepService" -> {
+                    val intent = Intent(this, StepForegroundService::class.java)
+                    startForegroundService(intent)
+                    result.success(null)
+                }
+                "stopStepService" -> {
+                    stopService(Intent(this, StepForegroundService::class.java))
+                    result.success(null)
+                }
+
+
                 else -> result.notImplemented()
             }
         }
