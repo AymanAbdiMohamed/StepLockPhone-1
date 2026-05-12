@@ -5,6 +5,11 @@ const Color _bgColor = Color(0xff1A1A2E);
 const Color _accentColor = Color(0xff16213E);
 const Color _highlightColor = Color(0xffE94560);
 
+// --- ADDED CONSTANTS ---
+const int _minSteps = 1;
+const int _maxSteps = 100000;
+const String _keyStepGoal = 'step_goal';
+
 class SettingsPage extends StatefulWidget {
   final int currentGoal;
 
@@ -15,8 +20,6 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  static const String _keyStepGoal = 'step_goal';
-
   late TextEditingController _goalController;
   final _formKey = GlobalKey<FormState>();
   bool _saving = false;
@@ -125,11 +128,11 @@ class _SettingsPageState extends State<SettingsPage> {
                       return 'Please enter a step goal';
                     }
                     final parsed = int.tryParse(value.trim());
-                    if (parsed == null || parsed <= 0) {
-                      return 'Please enter a valid positive number';
+                    if (parsed == null || parsed < _minSteps) {
+                      return 'Please enter a valid goal (min $_minSteps)';
                     }
-                    if (parsed > 100000) {
-                      return 'Step goal seems too high (max 100,000)';
+                    if (parsed > _maxSteps) {
+                      return 'Step goal seems too high (max $_maxSteps)';
                     }
                     return null;
                   },
