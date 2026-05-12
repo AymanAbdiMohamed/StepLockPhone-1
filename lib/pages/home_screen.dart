@@ -1,256 +1,179 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import '../services/step_service.dart';
-import '../services/lock_service.dart';
-import 'settings_page.dart';
-import 'lock_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const Color _bgColor = Color(0xff1A1A2E);
 const Color _accentColor = Color(0xff16213E);
-const Color _primaryColor = Color(0xff0F3460);
 const Color _highlightColor = Color(0xffE94560);
 
-class HomeScreen extends StatefulWidget {
-  final StepService stepService;
-  final LockService lockService;
-  final int currentSteps;
-  final int stepGoal;
+const int _minSteps = 1;
+const int _maxSteps = 100000;
+const String _keyStepGoal = 'step_goal';
 
-  const HomeScreen({
-    super.key,
-    required this.stepService,
-    required this.lockService,
-    required this.currentSteps,
-    required this.stepGoal,
-  });
+class SettingsPage extends StatefulWidget {
+  final int currentGoal;
+
+  const SettingsPage({super.key, required this.currentGoal});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  StreamSubscription<int>? _stepsSubscription;
-  late int _currentSteps;
-  late int _stepGoal;
+class _SettingsPageState extends State<SettingsPage> {
+  late TextEditingController _goalController;
+  final _formKey = GlobalKey<FormState>();
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _currentSteps = widget.currentSteps;
-    _stepGoal = widget.stepGoal;
-    _stepsSubscription = widget.stepService.stepsStream.listen((steps) {
-      if (!mounted) return;
-      setState(() {
-        _currentSteps = steps;
-      });
-    });
+    _goalController =
+        TextEditingController(text: widget.currentGoal.toString());
   }
 
   @override
   void dispose() {
-    _stepsSubscription?.cancel();
+    _goalController.dispose();
     super.dispose();
   }
 
-  Future<void> _openSettings() async {
-    final newGoal = await Navigator.of(context).push<int>(
-      MaterialPageRoute(builder: (_) => SettingsPage(currentGoal: _stepGoal)),
+  Future<void> _saveGoal() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _saving = true);
+
+    final goal = int.parse(_goalController.text.trim());
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_keyStepGoal, goal);
+
+    if (!mounted) return;
+    setState(() => _saving = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Step goal saved!'),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating, // Better look on modern Android
+      ),
     );
-    if (newGoal != null && mounted) {
-      setState(() {
-        _stepGoal = newGoal;
-      });
-    }
+
+    Navigator.of(context).pop(goal);
   }
 
   @override
   Widget build(BuildContext context) {
-    final progress = (_stepGoal > 0 ? _currentSteps / _stepGoal : 0.0).clamp(
-      0.0,
-      1.0,
-    );
-
     return Scaffold(
       backgroundColor: _bgColor,
       appBar: AppBar(
+        elevation: 0, // Cleaner flat look
         backgroundColor: _accentColor,
         title: const Text(
-          'StepLock',
+          'Settings',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white70),
-            tooltip: 'Settings',
-            onPressed: _openSettings,
-          ),
-        ],
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SafeArea(
-        child: Center(
+        child: SingleChildScrollView( // Prevents overflow when keyboard opens
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Checkmark icon
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: _primaryColor,
-                    shape: BoxShape.circle,
+            padding: const EdgeInsets.all(24.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Daily Step Goal',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.check_circle,
-                    size: 64,
-                    color: Colors.greenAccent,
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Set the number of steps required to unlock your phone each morning.',
+                    style: TextStyle(fontSize: 14, color: Colors.white54),
                   ),
-                ),
-                const SizedBox(height: 24),
-
-                // Phone Unlocked heading
-                const Text(
-                  'Phone Unlocked',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                  const SizedBox(height: 24),
+                  TextFormField(
+                    controller: _goalController,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.done, // Changes 'Enter' key to 'Done'
+                    onFieldSubmitted: (_) => _saveGoal(), // Saves on keyboard Enter
+                    style: const TextStyle(color: Colors.white, fontSize: 18),
+                    decoration: InputDecoration(
+                      labelText: 'Step goal',
+                      labelStyle: const TextStyle(color: Colors.white54),
+                      prefixIcon: const Icon(
+                        Icons.directions_walk,
+                        color: _highlightColor,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.white24),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: _highlightColor),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.redAccent),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.redAccent),
+                      ),
+                      filled: true,
+                      fillColor: _accentColor,
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter a step goal';
+                      }
+                      final parsed = int.tryParse(value.trim());
+                      if (parsed == null || parsed < _minSteps) {
+                        return 'Min goal is $_minSteps step';
+                      }
+                      if (parsed > _maxSteps) {
+                        return 'Max goal is $_maxSteps steps';
+                      }
+                      return null;
+                    },
                   ),
-                ),
-                const SizedBox(height: 8),
-
-                const Text(
-                  'Great job reaching your step goal!',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 15, color: Colors.white60),
-                ),
-                const SizedBox(height: 40),
-
-                // Stats card
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: _accentColor,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Today's Steps",
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white54,
-                          letterSpacing: 1.1,
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _saving ? null : _saveGoal,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _highlightColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            '$_currentSteps',
-                            style: const TextStyle(
-                              fontSize: 48,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Text(
-                              '/ $_stepGoal',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                color: Colors.white54,
+                      child: _saving
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Save',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 12,
-                          backgroundColor: _primaryColor,
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            Colors.greenAccent,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${(progress * 100).toInt()}% of daily goal',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.white54,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Debug button — only visible in debug builds, not in release
-                if (kDebugMode)
-                  TextButton(
-                    onPressed: () async {
-                      final navigator = Navigator.of(context);
-                      await widget.lockService.resetLock();
-                      if (!mounted) return;
-                      navigator.pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) => LockScreen(
-                            stepService: widget.stepService,
-                            lockService: widget.lockService,
-                          ),
-                        ),
-                      );
-                    },
-                    child: const Text(
-                      'Reset Lock (Debug)',
-                      style: TextStyle(color: Colors.white30),
                     ),
                   ),
-
-                const SizedBox(height: 32),
-
-                // Lock again tomorrow message
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _primaryColor.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _highlightColor.withValues(alpha: 0.4),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.lock_clock,
-                        size: 18,
-                        color: _highlightColor.withValues(alpha: 0.8),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Lock again tomorrow',
-                        style: TextStyle(fontSize: 14, color: Colors.white70),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
